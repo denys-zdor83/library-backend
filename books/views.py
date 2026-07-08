@@ -2,7 +2,9 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Q
+from django.db.models import Q, Avg
+from django.db.models.functions import Coalesce
+from django.db.models import FloatField, Value
 
 from accounts.permissions import IsAdmin, IsAdminOrLibrarian
 from .models import Book, Genre, BookRating
@@ -50,13 +52,20 @@ class BookListView(APIView):
             queryset = queryset.filter(status=book_status)
 
         sort = request.query_params.get('sort', '-created_at')
-        sort_map = {
-            'newest': '-created_at',
-            'oldest': 'created_at',
-            'popular': '-borrow_count',
-            'least_popular': 'borrow_count',
-        }
-        queryset = queryset.order_by(sort_map.get(sort, sort))
+
+        if sort in ('popular', 'least_popular'):
+            # Annotate with avg rating; books with no ratings get 0
+            queryset = queryset.annotate(
+                avg_rating=Coalesce(Avg('ratings__value'), Value(0.0, output_field=FloatField()))
+            )
+            order = '-avg_rating' if sort == 'popular' else 'avg_rating'
+            queryset = queryset.order_by(order, '-created_at')
+        else:
+            sort_map = {
+                'newest': '-created_at',
+                'oldest': 'created_at',
+            }
+            queryset = queryset.order_by(sort_map.get(sort, '-created_at'))
 
         page = int(request.query_params.get('page', 1))
         page_size = int(request.query_params.get('page_size', 12))
