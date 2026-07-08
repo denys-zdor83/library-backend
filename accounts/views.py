@@ -4,7 +4,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import CustomUser, LibrarianProfile, FavoriteGenre, Role
 from .serializers import (
@@ -81,12 +80,6 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
-        if refresh_token:
-            try:
-                RefreshToken(refresh_token).blacklist()
-            except TokenError:
-                pass
         response = Response({'message': 'Logged out successfully'})
         return clear_auth_cookies(response)
 

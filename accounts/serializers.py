@@ -52,7 +52,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    current_password = serializers.CharField(write_only=True)
+    old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True, validators=[validate_password])
     new_password2 = serializers.CharField(write_only=True)
 
@@ -61,7 +61,7 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError({'new_password': 'Passwords do not match.'})
         return data
 
-    def validate_current_password(self, value):
+    def validate_old_password(self, value):
         user = self.context['request'].user
         if not user.check_password(value):
             raise serializers.ValidationError('Current password is incorrect.')
@@ -94,9 +94,16 @@ class RegisterLibrarianSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['email', 'username', 'first_name', 'last_name', 'password']
+        fields = ['email', 'first_name', 'last_name', 'password']
 
     def create(self, validated_data):
-        user = CustomUser.objects.create_user(role=Role.LIBRARIAN, **validated_data)
+        email = validated_data['email']
+        username = email.split('@')[0]
+        base = username
+        counter = 1
+        while CustomUser.objects.filter(username=username).exists():
+            username = f'{base}{counter}'
+            counter += 1
+        user = CustomUser.objects.create_user(role=Role.LIBRARIAN, username=username, **validated_data)
         LibrarianProfile.objects.create(user=user, permissions=[])
         return user
