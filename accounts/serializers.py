@@ -13,13 +13,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
     favorite_genres = FavoriteGenreSerializer(many=True, read_only=True)
     full_name = serializers.CharField(read_only=True)
     avatar_url = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
         fields = [
             'id', 'email', 'username', 'first_name', 'last_name', 'full_name',
             'role', 'avatar', 'avatar_url', 'country', 'city', 'postal_code',
-            'bio', 'registered_at', 'favorite_genres',
+            'bio', 'registered_at', 'favorite_genres', 'permissions',
         ]
         read_only_fields = ['id', 'email', 'role', 'registered_at']
 
@@ -28,6 +29,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if obj.avatar and request:
             return request.build_absolute_uri(obj.avatar.url)
         return None
+
+    def get_permissions(self, obj):
+        if obj.role == 'librarian':
+            try:
+                return obj.librarian_profile.permissions
+            except Exception:
+                return []
+        return []
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -76,19 +85,26 @@ class ChangePasswordSerializer(serializers.Serializer):
         return value
 
 
+class LibrarianProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LibrarianProfile
+        fields = ['id', 'user', 'permissions']
+
+
 class LibrarianSerializer(serializers.ModelSerializer):
-    permissions = serializers.SerializerMethodField()
+    librarian_profile = serializers.SerializerMethodField()
+    full_name = serializers.CharField(read_only=True)
     avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'first_name', 'last_name', 'avatar', 'avatar_url', 'role', 'registered_at', 'permissions']
+        fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'avatar', 'avatar_url', 'role', 'registered_at', 'librarian_profile']
 
-    def get_permissions(self, obj):
+    def get_librarian_profile(self, obj):
         try:
-            return obj.librarian_profile.permissions
-        except LibrarianProfile.DoesNotExist:
-            return []
+            return LibrarianProfileSerializer(obj.librarian_profile).data
+        except Exception:
+            return None
 
     def get_avatar_url(self, obj):
         request = self.context.get('request')
