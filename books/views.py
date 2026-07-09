@@ -159,5 +159,13 @@ class PopularBooksView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        books = Book.objects.order_by('-borrow_count')[:8]
+        books = (
+            Book.objects
+            .select_related('genre')
+            .prefetch_related('ratings')
+            .annotate(
+                avg_rating=Coalesce(Avg('ratings__value'), Value(0.0, output_field=FloatField()))
+            )
+            .order_by('-avg_rating', '-borrow_count')[:8]
+        )
         return Response(BookListSerializer(books, many=True, context={'request': request}).data)
